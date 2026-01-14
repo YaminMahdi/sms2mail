@@ -62,10 +62,10 @@ class MainActivity : ComponentActivity() {
         val readContractsGranted = permissions[android.Manifest.permission.READ_CONTACTS] ?: false
 
         if (readSmsGranted) {
-//            viewModel.readAllSMS(contentResolver)
+            viewModel.readAllSMS(contentResolver)
         }
         if (readContractsGranted) {
-//            viewModel.readContacts(contentResolver)
+            viewModel.readContacts(contentResolver)
         }
     }
 
@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
                 android.Manifest.permission.READ_SMS
             ) == PackageManager.PERMISSION_GRANTED
         )
-//                viewModel.readAllSMS(contentResolver)
+            viewModel.readAllSMS(contentResolver)
         else {
             permissions.add(android.Manifest.permission.RECEIVE_SMS)
             permissions.add(android.Manifest.permission.READ_SMS)
@@ -116,7 +116,7 @@ class MainActivity : ComponentActivity() {
                 android.Manifest.permission.READ_CONTACTS
             ) == PackageManager.PERMISSION_GRANTED
         )
-//                viewModel.readContacts(contentResolver)
+            viewModel.readContacts(contentResolver)
         else
             permissions.add(android.Manifest.permission.READ_CONTACTS)
 
