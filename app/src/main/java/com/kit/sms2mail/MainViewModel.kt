@@ -40,6 +40,22 @@ import kotlin.coroutines.resume
 
 class MainViewModel : ViewModel() {
 
+    private var _userInfo : UserInfo? = null
+
+    private val _smsList = MutableStateFlow(listOf<Conversation>())
+    val smsList = _smsList.asStateFlow()
+
+    private val _contactList = MutableStateFlow(listOf<Contact>())
+    val contactList = _contactList.asStateFlow()
+
+    // Forward list - contains selected senders (from SMS) and contacts (from Contacts)
+    private val _forwardList = MutableStateFlow(listOf<String>())
+    val forwardList = _forwardList.asStateFlow()
+
+    // Email list - contains email addresses to send to
+    private val _emailList = MutableStateFlow(listOf<String>())
+    val emailList = _emailList.asStateFlow()
+
     suspend fun googleSignIn(activity: Activity): IntentSender? =
         withContext(Dispatchers.IO) {
             val userInfo = getUser()
@@ -122,11 +138,54 @@ class MainViewModel : ViewModel() {
             }
         }
 
-    private val _smsList = MutableStateFlow(listOf<Conversation>())
-    val smsList = _smsList.asStateFlow()
+    fun addToForwardList(senderList: List<String>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val current = _forwardList.value.toMutableList()
+            senderList.forEach { sender ->
+                if (!current.contains(sender))
+                    current.add(sender)
+            }
+            _forwardList.value = current
+            saveUser(getUser().copy(
+                forwardList = current
+            ))
+        }
+    }
 
-    private val _contactList = MutableStateFlow(listOf<Contact>())
-    val contactList = _contactList.asStateFlow()
+    fun removeFromForwardList(item: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val current = _forwardList.value.toMutableList()
+            current.remove(item)
+            _forwardList.value = current
+            saveUser(getUser().copy(
+                forwardList = current
+            ))
+        }
+    }
+
+    fun addEmail(email: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val current = _emailList.value.toMutableList()
+            if (!current.contains(email)) {
+                current.add(email)
+                _emailList.value = current
+                saveUser(getUser().copy(
+                    emailList = current
+                ))
+            }
+        }
+    }
+
+    fun removeEmail(email: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val current = _emailList.value.toMutableList()
+            current.remove(email)
+            _emailList.value = current
+            saveUser(getUser().copy(
+                emailList = current
+            ))
+        }
+    }
 
     //Phone   //conversation of that phone number
     fun saveMsg(sms: Msg) {
@@ -316,10 +375,24 @@ class MainViewModel : ViewModel() {
 
 
     suspend fun saveUser(userInfo: UserInfo) {
+        _userInfo = userInfo
         dataStore.save(StoreKeys.USER_INFO, userInfo)
     }
 
     suspend fun getUser(): UserInfo {
-        return dataStore.read(StoreKeys.USER_INFO, UserInfo())
+        return _userInfo ?: dataStore.read(StoreKeys.USER_INFO, UserInfo()).also {
+            _userInfo = it
+            _forwardList.value = it.forwardList
+            _emailList.value = it.emailList
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            dataStore.clear()
+            _userInfo = null
+            _forwardList.value = listOf()
+            _emailList.value = listOf()
+        }
     }
 }

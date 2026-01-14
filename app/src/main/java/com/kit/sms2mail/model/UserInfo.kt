@@ -1,10 +1,10 @@
 package com.kit.sms2mail.model
 
 import android.os.Parcelable
+import jakarta.mail.internet.InternetAddress
 import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import jakarta.mail.internet.InternetAddress
 
 /**
  * Represents user information.
@@ -23,8 +23,8 @@ data class UserInfo(
 
     @SerialName("token") val token: String? = null,
     @SerialName("grantedScopes") val grantedScopes: List<String> = listOf(),
-    @SerialName("fromContracts") val fromContracts: List<String> = listOf(),
-    @SerialName("toMails") val toMails: List<String> = listOf(),
+    @SerialName("forwardList") val forwardList: List<String> = listOf(),
+    @SerialName("emailList") val emailList: List<String> = listOf(),
 ) : Parcelable {
-    fun getRecipientAddresses() = toMails.map { InternetAddress(it) }
+    fun getRecipientAddresses() = emailList.map { InternetAddress(it) }
 }

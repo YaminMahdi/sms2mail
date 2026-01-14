@@ -93,6 +93,14 @@ dependencies {
     implementation(libs.datastore.pref)
     implementation(libs.kotlinx.serialization.json)
 
+    //navigation 3
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+
+
+    //material icons
+    implementation(libs.androidx.compose.material.icons.extended)
+
 
 
     testImplementation(libs.junit)

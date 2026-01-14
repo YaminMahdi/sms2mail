@@ -12,13 +12,22 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.ui.NavDisplay
 import com.google.android.gms.auth.api.identity.Identity
+import com.kit.sms2mail.ui.navigation.ContactSelectionRoute
+import com.kit.sms2mail.ui.navigation.HomeRoute
+import com.kit.sms2mail.ui.navigation.SmsSelectionRoute
+import com.kit.sms2mail.ui.screens.AddEmailDialog
+import com.kit.sms2mail.ui.screens.ContactSelectionScreen
+import com.kit.sms2mail.ui.screens.HomeScreen
+import com.kit.sms2mail.ui.screens.SmsSelectionScreen
 import com.kit.sms2mail.ui.theme.Sms2MailTheme
 import kotlinx.coroutines.launch
 
@@ -84,12 +93,7 @@ class MainActivity : ComponentActivity() {
         requestPermissions()
         setContent {
             Sms2MailTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                Sms2MailApp(viewModel = viewModel)
             }
         }
     }
@@ -125,19 +129,99 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+fun Sms2MailApp(viewModel: MainViewModel) {
+    val backStack = rememberNavBackStack(HomeRoute)
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    Sms2MailTheme {
-        Greeting("Android")
+    // Collect states from ViewModel
+    val smsList by viewModel.smsList.collectAsStateWithLifecycle()
+    val contactList by viewModel.contactList.collectAsStateWithLifecycle()
+    val forwardList by viewModel.forwardList.collectAsStateWithLifecycle()
+    val emailList by viewModel.emailList.collectAsStateWithLifecycle()
+
+    // State for dialogs
+    var showEmailDialog by remember { mutableStateOf(false) }
+
+    // Selection states for multi-select screens
+    var selectedSmsItems by remember { mutableStateOf(setOf<String>()) }
+    var selectedContactItems by remember { mutableStateOf(setOf<String>()) }
+
+
+    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+        NavDisplay(
+            backStack = backStack,
+            entryProvider = entryProvider {
+                entry<HomeRoute> {
+                    HomeScreen(
+                        forwardList = forwardList,
+                        emailList = emailList,
+                        serviceStatus = true,
+                        onRemoveForward = { viewModel.removeFromForwardList(it) },
+                        onRemoveEmail = { viewModel.removeEmail(it) },
+                        onAddFromSms = {
+                            selectedSmsItems = setOf()
+                            backStack.add(SmsSelectionRoute)
+                        },
+                        onAddFromContact = {
+                            selectedContactItems = setOf()
+                            backStack.add(ContactSelectionRoute)
+                        },
+                        onAddEmail = { showEmailDialog = true },
+                        onServiceStatusChange = {  },
+                        onLogoutClick = viewModel::logout,
+                        modifier = Modifier.padding(innerPadding),
+                    )
+                }
+
+                entry<SmsSelectionRoute> {
+                    SmsSelectionScreen(
+                        smsList = smsList,
+                        selectedSenders = selectedSmsItems,
+                        onSenderToggle = { sender ->
+                            selectedSmsItems = if (selectedSmsItems.contains(sender)) {
+                                selectedSmsItems - sender
+                            } else {
+                                selectedSmsItems + sender
+                            }
+                        },
+                        onConfirm = {
+                            viewModel.addToForwardList(selectedSmsItems.toList())
+                            backStack.removeLastOrNull()
+                        },
+                        onBack = { backStack.removeLastOrNull() }
+                    )
+                }
+
+                entry<ContactSelectionRoute> {
+                    ContactSelectionScreen(
+                        contactList = contactList,
+                        selectedContacts = selectedContactItems,
+                        onContactToggle = { number ->
+                            selectedContactItems = if (selectedContactItems.contains(number)) {
+                                selectedContactItems - number
+                            } else {
+                                selectedContactItems + number
+                            }
+                        },
+                        onConfirm = {
+                            viewModel.addToForwardList(selectedContactItems.toList())
+                            backStack.removeLastOrNull()
+                        },
+                        onBack = { backStack.removeLastOrNull() }
+                    )
+                }
+            }
+        )
+    }
+
+    // Email Dialog
+    if (showEmailDialog) {
+        AddEmailDialog(
+            onDismiss = { showEmailDialog = false },
+            onConfirm = { email ->
+                viewModel.addEmail(email)
+                showEmailDialog = false
+            }
+        )
     }
 }

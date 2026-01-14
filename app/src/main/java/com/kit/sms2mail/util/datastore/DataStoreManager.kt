@@ -54,7 +54,7 @@ class DataStoreManager(val context: Context) {
      *
      * @param nextJob The next job to run after clearing the DataStore.
      */
-    suspend fun clear(nextJob: () -> Unit) {
+    suspend fun clear(nextJob: () -> Unit = {}) {
         withContext(Dispatchers.IO) {
             context.dataStore.edit { preference ->
                 preference.clear()
