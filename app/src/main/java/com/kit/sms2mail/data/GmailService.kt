@@ -63,6 +63,8 @@ class GmailService {
 
                 if (!BuildConfig.DEBUG && (originatingAddress.isNullOrEmpty() || originatingAddress !in userInfo.forwardFromList))
                     error("SMS from unknown sender")
+                if (!userInfo.serviceStatus)
+                    error("Service not enabled")
                 if (userInfo.refreshToken == null)
                     error("No refresh token available")
 

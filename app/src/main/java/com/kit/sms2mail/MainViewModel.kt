@@ -155,6 +155,8 @@ class MainViewModel : ViewModel() {
                     forwardFromList = current.distinct()
                 )
             )
+            if (current.isNotEmpty() && userInfo.value.emailList.isNotEmpty() && !userInfo.value.serviceStatus)
+                updateServiceStatus(true)
         }
     }
 
@@ -182,6 +184,8 @@ class MainViewModel : ViewModel() {
                 )
             }
         }
+        if (userInfo.value.forwardFromList.isNotEmpty() && !userInfo.value.serviceStatus)
+            updateServiceStatus(true)
     }
 
     fun removeEmail(email: String) {

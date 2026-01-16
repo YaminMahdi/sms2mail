@@ -48,7 +48,7 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -74,6 +74,18 @@ android {
                     "META-INF/DEPENDENCIES"
                 )
             )
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach {
+            val output = it as com.android.build.api.variant.impl.VariantOutputImpl
+            val projectName = rootProject.name.replace(" ", "_")
+            val version = output.versionName.get()
+            val buildType = variant.name
+            output.outputFileName = "${projectName}_v$version-$buildType.apk"
         }
     }
 }
