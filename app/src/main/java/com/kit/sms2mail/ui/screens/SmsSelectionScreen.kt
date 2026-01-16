@@ -20,8 +20,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.kit.sms2mail.model.Conversation
+import com.kit.sms2mail.ui.components.EmptyStateBox
+import com.kit.sms2mail.ui.theme.Sms2MailTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,7 +75,9 @@ fun SmsSelectionScreen(
         if (smsList.isEmpty()) {
             EmptyStateBox(
                 message = "No SMS conversations found",
-                modifier = Modifier.padding(paddingValues)
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize()
             )
         } else {
             LazyColumn(
@@ -80,7 +85,8 @@ fun SmsSelectionScreen(
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background)
                     .padding(top = paddingValues.calculateTopPadding())
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(smsList, key = { it.sender }) { conversation ->
@@ -176,30 +182,16 @@ private fun SmsItem(
     }
 }
 
+@Preview
 @Composable
-private fun EmptyStateBox(
-    message: String,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Sms,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.size(64.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            )
-        }
+private fun SmsSelectionScreenPrev() {
+    Sms2MailTheme {
+        SmsSelectionScreen(
+            smsList = listOf(),
+            selectedSenders = setOf(),
+            onSenderToggle = {},
+            onConfirm = {},
+            onBack = {}
+        )
     }
 }

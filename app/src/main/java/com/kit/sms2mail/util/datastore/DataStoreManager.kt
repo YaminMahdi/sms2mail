@@ -26,6 +26,13 @@ class DataStoreManager(val context: Context) {
                 name = StoreKeys.STORE_PREF
             )
 
+    val json by lazy {
+        Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
+    }
+
     /**
      * Saves data to the DataStore.
      *
@@ -43,7 +50,7 @@ class DataStoreManager(val context: Context) {
                     is Float -> preference[floatPreferencesKey(key)] = data
                     is Double -> preference[doublePreferencesKey(key)] = data
                     is Boolean -> preference[booleanPreferencesKey(key)] = data
-                    else -> preference[stringPreferencesKey(key)] = Json.encodeToString(data)
+                    else -> preference[stringPreferencesKey(key)] = json.encodeToString(data)
                 }
             }
         }
@@ -95,7 +102,7 @@ class DataStoreManager(val context: Context) {
         return when (data) {
             is String -> {
                 if (isObject)
-                    Json.decodeFromString(data)
+                    json.decodeFromString(data)
                 else
                     data as T
             }
@@ -140,7 +147,7 @@ class DataStoreManager(val context: Context) {
                 when (val data = preference[prefKey]) {
                     is String -> {
                         if (isObject)
-                            Json.decodeFromString(data)
+                            json.decodeFromString(data)
                         else
                             data as T
                     }

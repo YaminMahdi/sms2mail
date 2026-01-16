@@ -22,6 +22,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val localProperties = org.jetbrains.kotlin.konan.properties.Properties().apply {
+            val localPropertiesFile = project.rootProject.file("local.properties")
+            load(localPropertiesFile.inputStream())
+        }
+        buildConfigField("String", "WEB_CLIENT_SECRET", "${localProperties.getProperty("WEB_CLIENT_SECRET")}")
     }
 
 
@@ -56,6 +62,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
@@ -93,15 +100,15 @@ dependencies {
     implementation(libs.datastore.pref)
     implementation(libs.kotlinx.serialization.json)
 
+    implementation(libs.bundles.ktor)
+
     //navigation 3
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
 
-
     //material icons
     implementation(libs.androidx.compose.material.icons.extended)
-
-
+    implementation(libs.androidx.work.runtime.ktx)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

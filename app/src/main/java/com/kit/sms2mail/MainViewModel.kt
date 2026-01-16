@@ -1,9 +1,9 @@
 package com.kit.sms2mail
 
+import android.accounts.Account
 import android.app.Activity
 import android.content.ContentResolver
 import android.content.IntentSender
-import android.credentials.GetCredentialException
 import android.graphics.drawable.Drawable
 import android.provider.ContactsContract
 import android.provider.Telephony
@@ -14,33 +14,36 @@ import androidx.core.net.toUri
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
-import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.auth.api.identity.AuthorizationRequest
-import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.auth.GoogleAuthUtil
+import com.google.android.gms.auth.api.identity.*
 import com.google.android.gms.common.api.Scope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.api.services.gmail.GmailScopes
+import com.kit.sms2mail.data.TokenValidatorService
 import com.kit.sms2mail.model.Contact
 import com.kit.sms2mail.model.Conversation
 import com.kit.sms2mail.model.Msg
 import com.kit.sms2mail.model.UserInfo
 import com.kit.sms2mail.util.Constants
 import com.kit.sms2mail.util.datastore.StoreKeys
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.stateIn
 import java.util.Collections
 import kotlin.coroutines.resume
 
 
 class MainViewModel : ViewModel() {
 
-    private var _userInfo : UserInfo? = null
+    private val tokenValidatorService = TokenValidatorService()
+
+    val userInfo = dataStore.readAsFlow(StoreKeys.USER_INFO, UserInfo())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, UserInfo())
 
     private val _smsList = MutableStateFlow(listOf<Conversation>())
     val smsList = _smsList.asStateFlow()
@@ -48,18 +51,12 @@ class MainViewModel : ViewModel() {
     private val _contactList = MutableStateFlow(listOf<Contact>())
     val contactList = _contactList.asStateFlow()
 
-    // Forward list - contains selected senders (from SMS) and contacts (from Contacts)
-    private val _forwardList = MutableStateFlow(listOf<String>())
-    val forwardList = _forwardList.asStateFlow()
-
-    // Email list - contains email addresses to send to
-    private val _emailList = MutableStateFlow(listOf<String>())
-    val emailList = _emailList.asStateFlow()
+    var readSmsGranted = false
+    var readContractsGranted = false
 
     suspend fun googleSignIn(activity: Activity): IntentSender? =
         withContext(Dispatchers.IO) {
-            val userInfo = getUser()
-            if (userInfo.token != null) {
+            if (dataStore.read(StoreKeys.USER_INFO, UserInfo()).accessToken != null) {
                 return@withContext null
             }
             val signInGoogleOption = GetGoogleIdOption.Builder()
@@ -86,143 +83,121 @@ class MainViewModel : ViewModel() {
                         photoUrl = googleCredential.profilePictureUri?.toString()
                             ?.replace("=s96", "=s384")
                     )
-                    saveUser(user)
+//                    val requestedScopes = listOf(
+//                        Scope("https://www.googleapis.com/auth/gmail.send"),
+//                        Scope("https://www.googleapis.com/auth/userinfo.email"),
+//                        Scope("https://www.googleapis.com/auth/userinfo.profile")
+//                    )
                     val requestedScopes = listOf(
-                        Scope("https://www.googleapis.com/auth/gmail.send"),
-                        Scope("https://www.googleapis.com/auth/userinfo.email"),
-                        Scope("https://www.googleapis.com/auth/userinfo.profile")
+                        Scope(GmailScopes.GMAIL_SEND),
+                        Scope("email"),
+                        Scope("profile")
                     )
+                    @Suppress("DEPRECATION")
                     val authorizationRequest = AuthorizationRequest.builder()
+                        .requestOfflineAccess(Constants.WEB_CLIENT_ID, true)
                         .setRequestedScopes(requestedScopes)
                         .build()
 
-                    suspendCancellableCoroutine { continuation ->
+                    val authorizationResult = suspendCancellableCoroutine { continuation ->
                         Identity.getAuthorizationClient(activity)
                             .authorize(authorizationRequest)
                             .addOnSuccessListener { authorizationResult ->
-                                if (authorizationResult.hasResolution()) {
-                                    // This means we need to show a consent screen to the user
-                                    val pendingIntent = authorizationResult.pendingIntent
-                                    // Launch the intent using ActivityResultLauncher
-                                    continuation.resume(pendingIntent?.intentSender)
-                                } else {
-                                    // Access already granted! You can use authorizationResult.accessToken
-                                    val token = authorizationResult.accessToken
-                                    val grantedScopes = authorizationResult.grantedScopes
-
-                                    viewModelScope.launch {
-                                        saveUser(
-                                            userInfo = user.copy(
-                                                token = token,
-                                                grantedScopes = grantedScopes
-                                            )
-                                        )
-                                    }
-
-                                    Log.d("AUTH", "Access Token: $token")
-
-                                    continuation.resume(null)
-                                }
+                                continuation.resume(authorizationResult)
                             }
                     }
-
+                    if (authorizationResult.hasResolution()) {
+                        // This means we need to show a consent screen to the user
+                        saveUser(userInfo = user)
+                        authorizationResult.pendingIntent?.intentSender
+                        // Launch the intent using ActivityResultLauncher
+                    } else {
+                        // Access already granted! You can use authorizationResult.accessToken
+                        saveUserAuthInfo(authResult = authorizationResult, userInfo = user)
+                        null
+                    }
                 } else
                     error("Only Google Account Allowed")
-            } catch (e: GetCredentialCancellationException) {
-                if (e.type == GetCredentialException.TYPE_USER_CANCELED) error("null")
-                e.printStackTrace()
-                null
             } catch (e: Exception) {
                 e.printStackTrace()
                 null
             }
         }
 
+    suspend fun saveUserAuthInfo(
+        authResult: AuthorizationResult,
+        userInfo: UserInfo = this@MainViewModel.userInfo.value
+    ) {
+        var user = userInfo.copy()
+        val token = authResult.accessToken
+        val authCode = authResult.serverAuthCode
+        user = user.copy(
+            authCode = authCode,
+            accessToken = token
+        )
+//        user = tokenValidatorService.validateToken(userInfo = user)
+        user = tokenValidatorService.generateRefreshToken(
+            userInfo = user,
+            clientId = Constants.WEB_CLIENT_ID,
+            clientSecret = BuildConfig.WEB_CLIENT_SECRET,
+        )
+        saveUser(userInfo = user)
+        Log.d("AUTH", "Access Token: $token")
+    }
+
     fun addToForwardList(senderList: List<String>) {
         viewModelScope.launch(Dispatchers.IO) {
-            val current = _forwardList.value.toMutableList()
-            senderList.forEach { sender ->
-                if (!current.contains(sender))
-                    current.add(sender)
-            }
-            _forwardList.value = current
-            saveUser(getUser().copy(
-                forwardList = current
-            ))
+            val current = userInfo.value.forwardFromList.toMutableList()
+            current.addAll(senderList)
+            saveUser(
+                userInfo.value.copy(
+                    forwardFromList = current.distinct()
+                )
+            )
         }
     }
 
     fun removeFromForwardList(item: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val current = _forwardList.value.toMutableList()
+            val current = userInfo.value.forwardFromList.toMutableList()
             current.remove(item)
-            _forwardList.value = current
-            saveUser(getUser().copy(
-                forwardList = current
-            ))
+            saveUser(
+                userInfo.value.copy(
+                    forwardFromList = current
+                )
+            )
         }
     }
 
     fun addEmail(email: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val current = _emailList.value.toMutableList()
+            val current = userInfo.value.emailList.toMutableList()
             if (!current.contains(email)) {
                 current.add(email)
-                _emailList.value = current
-                saveUser(getUser().copy(
-                    emailList = current
-                ))
+                saveUser(
+                    userInfo.value.copy(
+                        emailList = current
+                    )
+                )
             }
         }
     }
 
     fun removeEmail(email: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val current = _emailList.value.toMutableList()
+            val current = userInfo.value.emailList.toMutableList()
             current.remove(email)
-            _emailList.value = current
-            saveUser(getUser().copy(
-                emailList = current
-            ))
-        }
-    }
-
-    //Phone   //conversation of that phone number
-    fun saveMsg(sms: Msg) {
-        //working on Input Output thread for better performance
-        viewModelScope.launch(Dispatchers.IO) {
-            val tmpConv = _smsList.value.toMutableList()
-
-            //adding same contract with country code and without country code in a single conversation
-            var fixDuplicate = false
-            tmpConv.map { it.sender }.forEachIndexed { ind, pn ->
-                if ((pn.slice(4..<pn.length) == sms.phone) ||
-                    (pn.slice(3..<pn.length) == sms.phone) ||
-                    (pn.slice(2..<pn.length) == sms.phone)
-                ) {
-                    tmpConv[ind].messages.add(sms)
-                    fixDuplicate = true
-                }
-            }
-
-            //adding sms to old conversation if exist
-            if (tmpConv.map { it.sender }.contains(sms.phone)) {
-                val ind = tmpConv.map { it.sender }.indexOf(sms.phone)
-                tmpConv[ind].messages.add(sms)
-            }
-            //creating new conversation
-            else if (!fixDuplicate) {
-                tmpConv.add(0, Conversation(sender = sms.phone, messages = mutableListOf(sms)))
-            }
-            //sorting is needed so that new sms comes in top
-            tmpConv.sortByDescending { it.messages.last().time }
-
-            _smsList.value = tmpConv
+            saveUser(
+                userInfo.value.copy(
+                    emailList = current
+                )
+            )
         }
     }
 
     fun readAllSMS(cr: ContentResolver) {
         viewModelScope.launch(Dispatchers.IO) {
+            delay(300)
             val totalMsgList = mutableListOf<Msg>()
             val conversations = mutableListOf<Conversation>()
 
@@ -291,6 +266,7 @@ class MainViewModel : ViewModel() {
 
     fun readContacts(contentResolver: ContentResolver?) {
         viewModelScope.launch(Dispatchers.IO) {
+            delay(700)
             val contacts = getContractList(contentResolver)
             _contactList.value = contacts
         }
@@ -375,24 +351,37 @@ class MainViewModel : ViewModel() {
 
 
     suspend fun saveUser(userInfo: UserInfo) {
-        _userInfo = userInfo
         dataStore.save(StoreKeys.USER_INFO, userInfo)
     }
 
-    suspend fun getUser(): UserInfo {
-        return _userInfo ?: dataStore.read(StoreKeys.USER_INFO, UserInfo()).also {
-            _userInfo = it
-            _forwardList.value = it.forwardList
-            _emailList.value = it.emailList
+    fun logout(activity: Activity) {
+        viewModelScope.launch {
+            val account = Account(userInfo.value.email, GoogleAuthUtil.GOOGLE_ACCOUNT_TYPE)
+            val revokeAccessRequest = RevokeAccessRequest.builder()
+                .setAccount(account)
+                .setScopes(listOf(Scope(GmailScopes.GMAIL_SEND)))
+                .build()
+
+            Identity.getAuthorizationClient(activity)
+                .revokeAccess(revokeAccessRequest)
+
+            val token = userInfo.value.accessToken
+            token?.let {
+                Identity.getAuthorizationClient(activity)
+                    .clearToken(ClearTokenRequest.builder().setToken(token).build())
+            }
+            dataStore.clear()
+            activity.finish()
         }
     }
 
-    fun logout() {
+    fun updateServiceStatus(serviceStatus: Boolean) {
         viewModelScope.launch {
-            dataStore.clear()
-            _userInfo = null
-            _forwardList.value = listOf()
-            _emailList.value = listOf()
+            saveUser(userInfo.value.copy(serviceStatus = serviceStatus))
         }
+    }
+
+    companion object {
+        const val TAG = "MainViewModel"
     }
 }

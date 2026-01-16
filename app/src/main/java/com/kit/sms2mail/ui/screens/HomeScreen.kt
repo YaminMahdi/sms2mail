@@ -8,10 +8,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,13 +18,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.kit.sms2mail.model.UserInfo
+import com.kit.sms2mail.ui.components.AppBar
+import com.kit.sms2mail.ui.components.EmptyListPlaceholder
+import com.kit.sms2mail.ui.components.UserInfoCard
 import com.kit.sms2mail.ui.theme.Sms2MailTheme
-import com.kit.sms2mail.util.Constants
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    forwardList: List<String>,
+    userInfo: UserInfo,
+    forwardFromList: List<String>,
     emailList: List<String>,
     serviceStatus: Boolean,
     onRemoveForward: (String) -> Unit,
@@ -45,8 +48,8 @@ fun HomeScreen(
         // Top App Bar
         AppBar(
             title = "SMS2Mail",
-            isSwitchChecked = serviceStatus,
-            onSwitchChange = onServiceStatusChange,
+            serviceStatus = serviceStatus,
+            onServiceStatusChange = onServiceStatusChange,
             onLogoutClick = onLogoutClick
         )
 
@@ -58,9 +61,10 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Forward from Contact List section
+            UserInfoCard(userInfo = userInfo)
             ForwardListSection(
                 modifier = Modifier.weight(1f),
-                forwardList = forwardList,
+                forwardFromList = forwardFromList,
                 onRemove = onRemoveForward,
                 onAddFromSms = onAddFromSms,
                 onAddFromContact = onAddFromContact
@@ -77,67 +81,10 @@ fun HomeScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AppBar(
-    title: String,
-    isSwitchChecked: Boolean,
-    onSwitchChange: (Boolean) -> Unit,
-    onLogoutClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    TopAppBar(
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        },
-        actions = {
-            // Switch
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(end = 8.dp)
-            ) {
-                Switch(
-                    checked = isSwitchChecked,
-                    onCheckedChange = onSwitchChange,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
-                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                )
-            }
-
-            // Logout Button
-            IconButton(
-                onClick = onLogoutClick,
-                modifier = Modifier.padding(end = 4.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ExitToApp,
-                    contentDescription = "Logout",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            actionIconContentColor = MaterialTheme.colorScheme.onSurface
-        ),
-        windowInsets = WindowInsets(),
-        modifier = modifier
-    )
-}
-
 @Composable
 private fun ForwardListSection(
     modifier: Modifier = Modifier,
-    forwardList: List<String>,
+    forwardFromList: List<String>,
     onRemove: (String) -> Unit,
     onAddFromSms: () -> Unit,
     onAddFromContact: () -> Unit
@@ -221,16 +168,19 @@ private fun ForwardListSection(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(forwardList, key = { it }) { item ->
+                items(forwardFromList, key = { it }) { item ->
                     ForwardListItem(
                         text = item,
                         onRemove = { onRemove(item) }
                     )
                 }
 
-                if (forwardList.isEmpty()) {
+                if (forwardFromList.isEmpty()) {
                     item {
-                        EmptyListPlaceholder("No contacts added")
+                        EmptyListPlaceholder(
+                            text = "No contacts added",
+                            modifier = Modifier.fillParentMaxSize()
+                        )
                     }
                 }
             }
@@ -343,7 +293,10 @@ private fun EmailListSection(
 
                 if (emailList.isEmpty()) {
                     item {
-                        EmptyListPlaceholder("No emails added")
+                        EmptyListPlaceholder(
+                            text = "No emails added",
+                            modifier = Modifier.fillParentMaxSize()
+                        )
                     }
                 }
             }
@@ -413,85 +366,17 @@ private fun EmailListItem(
     }
 }
 
-@Composable
-private fun EmptyListPlaceholder(text: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-        )
-    }
-}
-
-@Composable
-fun AddEmailDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
-) {
-    var email by remember { mutableStateOf("") }
-    var isError by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                "Add Email",
-                fontWeight = FontWeight.SemiBold
-            )
-        },
-        text = {
-            OutlinedTextField(
-                value = email,
-                suffix = {
-                    Text("@${Constants.DOMAIN}")
-                },
-                onValueChange = {
-                    email = it.split("@").firstOrNull().orEmpty()
-                    isError = false
-                },
-                label = { Text("Email Address") },
-                singleLine = true,
-                isError = isError,
-                supportingText = if (isError) {
-                    { Text("Please enter a valid email") }
-                } else null,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val email = email.trim() + "@${Constants.DOMAIN}"
-                    if (email.contains("@") && email.contains(".")) {
-                        onConfirm(email.trim())
-                    } else {
-                        isError = true
-                    }
-                }
-            ) {
-                Text("Add")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
 @Preview
 @Composable
 private fun HomeScreenPrev() {
     Sms2MailTheme {
         HomeScreen(
-            forwardList = listOf("0345345", "534654654"),
+            userInfo = UserInfo(
+                email = "william.paterson@domain.com",
+                name = "John Doe",
+                phone = "+1 234 567 8900",
+            ),
+            forwardFromList = listOf("0345345", "534654654"),
             emailList = listOf("afbh@gf.com", "yk@gf.com"),
             serviceStatus = true,
             onServiceStatusChange = {},

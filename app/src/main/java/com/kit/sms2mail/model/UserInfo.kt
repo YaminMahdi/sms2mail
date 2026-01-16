@@ -21,10 +21,15 @@ data class UserInfo(
     @SerialName("phone") val phone: String? = null,
     @SerialName("photo_url") val photoUrl: String? = null,
 
-    @SerialName("token") val token: String? = null,
-    @SerialName("grantedScopes") val grantedScopes: List<String> = listOf(),
-    @SerialName("forwardList") val forwardList: List<String> = listOf(),
+    @SerialName("serviceStatus") val serviceStatus: Boolean = false,
+    @SerialName("accessToken") val accessToken: String? = null,
+    @SerialName("expiresAt") val expiresAt: Long = 0L,
+    @SerialName("refreshToken") val refreshToken: String? = null,
+    @SerialName("authCode") val authCode: String? = null,
+    @SerialName("forwardFromList") val forwardFromList: List<String> = listOf(),
     @SerialName("emailList") val emailList: List<String> = listOf(),
 ) : Parcelable {
     fun getRecipientAddresses() = emailList.map { InternetAddress(it) }
+
+    fun isTokenExpired() = System.currentTimeMillis() >= expiresAt
 }

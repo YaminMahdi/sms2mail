@@ -23,9 +23,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.kit.sms2mail.model.Contact
+import com.kit.sms2mail.ui.components.EmptyStateBox
+import com.kit.sms2mail.ui.theme.Sms2MailTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,9 +77,12 @@ fun ContactSelectionScreen(
         modifier = modifier
     ) { paddingValues ->
         if (contactList.isEmpty()) {
-            EmptyContactStateBox(
+            EmptyStateBox(
                 message = "No contacts found",
-                modifier = Modifier.padding(paddingValues)
+                imageVector = Icons.Rounded.Person,
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize()
             )
         } else {
             LazyColumn(
@@ -84,7 +90,8 @@ fun ContactSelectionScreen(
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background)
                     .padding(top = paddingValues.calculateTopPadding())
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(contactList, key = { it.number ?: it.hashCode() }) { contact ->
@@ -108,9 +115,9 @@ private fun ContactItem(
     onClick: () -> Unit
 ) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected) 
-            MaterialTheme.colorScheme.primaryContainer 
-        else 
+        targetValue = if (isSelected)
+            MaterialTheme.colorScheme.primaryContainer
+        else
             MaterialTheme.colorScheme.surfaceVariant,
         label = "bgColor"
     )
@@ -171,9 +178,9 @@ private fun ContactItem(
                         )
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.width(16.dp))
-                
+
                 Column {
                     Text(
                         text = contact.name ?: "Unknown",
@@ -186,7 +193,7 @@ private fun ContactItem(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    
+
                     contact.number?.let { number ->
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
@@ -206,30 +213,17 @@ private fun ContactItem(
     }
 }
 
+
+@Preview
 @Composable
-private fun EmptyContactStateBox(
-    message: String,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Person,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.size(64.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            )
-        }
+private fun ContactSelectionScreenPrev() {
+    Sms2MailTheme {
+        ContactSelectionScreen(
+            contactList = listOf(),
+            selectedContacts = setOf(),
+            onContactToggle = {},
+            onConfirm = {},
+            onBack = {}
+        )
     }
 }
