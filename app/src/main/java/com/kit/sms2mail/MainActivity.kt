@@ -71,6 +71,11 @@ class MainActivity : ComponentActivity() {
                 // Request SMS permissions
                 requestPermissions()
             }
+//            SendEmailWorker.enqueueOneTimeWork(
+//                context = this@MainActivity,
+//                originatingAddress = "Ahmad Umar Mahdi",
+//                messageBody = "Just popping in to say hi from the other side of the screen. Catch you on the flip side!"
+//            )
         }
         setContent {
             Sms2MailTheme {

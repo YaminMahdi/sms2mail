@@ -93,6 +93,7 @@ class MainViewModel : ViewModel() {
                         Scope("email"),
                         Scope("profile")
                     )
+
                     @Suppress("DEPRECATION")
                     val authorizationRequest = AuthorizationRequest.builder()
                         .requestOfflineAccess(Constants.WEB_CLIENT_ID, true)
@@ -142,7 +143,7 @@ class MainViewModel : ViewModel() {
             clientSecret = BuildConfig.WEB_CLIENT_SECRET,
         )
         saveUser(userInfo = user)
-        Log.d("AUTH", "Access Token: $token")
+        Log.d(TAG, "Access Token: $token")
     }
 
     fun addToForwardList(senderList: List<String>) {
@@ -228,8 +229,6 @@ class MainViewModel : ViewModel() {
 
                 val msg = Msg(phone = number, sms = text, time = time, type = type)
                 totalMsgList.add(msg)
-
-                Log.d("TAG", "$msg")
             }
             cursor.close()
             //building conversation
@@ -344,7 +343,7 @@ class MainViewModel : ViewModel() {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-            Log.d("MainViewModel", "getContractList: $userContacts")
+            Log.d(TAG, "getContractList: $userContacts")
             userContacts.distinctBy { it.number }
         }
     }
